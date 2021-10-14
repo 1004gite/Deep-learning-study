@@ -8,11 +8,18 @@ def demo():
     input_path = './data/preprocessedYale/subject' + \
         str(num)+'/subject'+str(num)+'.normal.jpg'
 
-    img = Image.open(input_path)
     trans = transforms.Compose([transforms.Resize((200, 200)),
                                 transforms.ToTensor(),
                                 # transforms.Grayscale(num_output_channels=1)
                                 ])
+    # find similar
+    if num == 'custom':
+        input_path = './data/custom.jpg'
+        trans = transforms.Compose([transforms.Resize((200, 200)),
+                                    transforms.ToTensor(),
+                                    transforms.Grayscale(num_output_channels=1)])
+
+    img = Image.open(input_path)
     image = trans(img)
 
     image = image.unsqueeze(0)
