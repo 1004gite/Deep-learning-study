@@ -59,19 +59,21 @@ def main():
             # 훈련 (훈련 후)
             model = train.train(model, criterion, optimizer,
                                 train_loader, device, batch, epoch, lr)
-            model.eval()
+
             # 모델 저장
             if not os.path.isdir('./savedModel'):
                 os.mkdir('./savedModel')
-            # for python
-            torch.save(model, model_saved_path)
             # for Android
+            model.eval()
             example = torch.rand(1, 1, 200, 200)
             traced_script_module = torch.jit.trace(model, example)
             traced_script_module_optimized = optimize_for_mobile(
                 traced_script_module)
             traced_script_module_optimized._save_for_lite_interpreter(
                 './savedModel/androidModel.ptl')
+            # for python
+            torch.save(model, model_saved_path)
+
             # scripted_model = torch.jit.script(model)
             # opt_model = torch.utils.optimize_for_mobile(scripted_model)
             # torch.jit.save(opt_model, './savedModel/androidModel.pt')

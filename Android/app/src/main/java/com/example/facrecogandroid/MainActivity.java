@@ -5,7 +5,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.Context;
 import android.graphics.BitmapFactory;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
@@ -13,13 +15,10 @@ import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import org.pytorch.IValue;
 import org.pytorch.LiteModuleLoader;
 import org.pytorch.Module;
 import org.pytorch.Tensor;
-import org.pytorch.torchvision.TensorImageUtils;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -38,8 +37,7 @@ public class MainActivity extends AppCompatActivity {
     String fileName = "";
     Module module;
     Bitmap bitmap;
-    static float[] NO_MEAN_GRAY = new float[] {0.0f};
-    static float[] NO_STD_GRAY = new float[] {1.0f};
+    long[] tensorShape = new long[] {1,1,200,200};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,7 +69,6 @@ public class MainActivity extends AppCompatActivity {
 
         // 모델 불러오기
         try {
-//            module = LiteModuleLoader.load(assetFilePath(this,"androidModel.pt"));
             module = LiteModuleLoader.load(assetFilePath(this,"androidModel.ptl"));
         } catch (IOException e) {
             e.printStackTrace();
@@ -90,11 +87,17 @@ public class MainActivity extends AppCompatActivity {
         }
 
         //to tensor
-        Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(bitmap,
-                TensorImageUtils.TORCHVISION_NORM_MEAN_RGB, TensorImageUtils.TORCHVISION_NORM_STD_RGB);
+//        Tensor inputTensor = TensorImageUtils.bitmapToFloat32Tensor(bitmap,
+//                TensorImageUtils.TORCHVISION_NORM_MEAN_RGB, TensorImageUtils.TORCHVISION_NORM_STD_RGB);
+        Tensor inputTensor = Tensor.fromBlob(bitmapToGrayArr(bitmap),tensorShape);
         // 결과값 예측
         Tensor outputTensor = module.forward(IValue.from(inputTensor)).toTensor();
         float[] scores = outputTensor.getDataAsFloatArray();
+
+        //////
+        for (int i = 0; i < scores.length; i++) {
+            Log.wtf(Integer.toString(i),Float.toString(scores[i]));
+        }
 
         float maxScore = -Float.MAX_VALUE;
         int maxScoreIdx = -1;
@@ -105,22 +108,55 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         String resultName;
-        if(maxScoreIdx < 10) {
-            resultName = "test0" + Integer.toString(maxScoreIdx)+".jpg";
+        if(maxScoreIdx < 9) {
+            resultName = "test0" + Integer.toString(maxScoreIdx+1)+".jpg";
         }
         else{
-            resultName = "test" + Integer.toString(maxScoreIdx)+".jpg";
+            resultName = "test" + Integer.toString(maxScoreIdx+1)+".jpg";
         }
         textResult.setText(resultName);
         try {
             Bitmap tmpBitmap = BitmapFactory.decodeStream(getAssets().open(resultName));
             imageResult.setImageBitmap(tmpBitmap);
+//            imageResult.setImageBitmap(bitmap);
             Toast.makeText(getApplicationContext(),"Predicted",Toast.LENGTH_SHORT).show();
         } catch (IOException e) {
             Toast.makeText(getApplicationContext(),"file error2",Toast.LENGTH_SHORT).show();
             e.printStackTrace();
         }
     }
+
+
+    private float[] bitmapToGrayArr(final Bitmap bitmap){
+        int width, height;
+        width = bitmap.getWidth();
+        height = bitmap.getHeight();
+
+        float[] result = new float[width*height];
+
+        // color information
+        float R, G, B;
+        int pixel;
+
+        // scan through all pixels
+        int i = 0;
+        for (int y = 0; y < width; ++y) {
+            for (int x = 0; x < height; ++x) {
+                // get pixel color
+                pixel = bitmap.getPixel(x, y);
+                R = (float) Color.red(pixel);
+                G = (float) Color.green(pixel);
+                B = (float) Color.blue(pixel);
+                float gray = (int)(0.2989f * R + 0.5870f * G + 0.1140f * B);
+
+                result[i] = gray;
+                i++;
+            }
+        }
+        return result;
+
+    }
+
 
 
     public static String assetFilePath(Context context, String assetName) throws IOException {

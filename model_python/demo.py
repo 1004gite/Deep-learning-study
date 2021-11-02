@@ -23,6 +23,7 @@ def demo():
     image = trans(img)
 
     image = image.unsqueeze(0)
+    # print(image.shape)
 
     model = torch.load('./savedModel/savedCNN.pt')
     model.eval()
