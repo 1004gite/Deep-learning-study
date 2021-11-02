@@ -1,5 +1,7 @@
 # face_recognition
 얼굴 인식을 위한 딥러닝 모델 공부
+yale face dataset 이용
+
 
 ## 파이썬
 >> pytorch 라이브러리 이용  
