@@ -6,6 +6,7 @@ import android.content.Context;
 import android.graphics.BitmapFactory;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.Icon;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -33,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
     Button btnSetInput;
     Button btnPredict;
     ImageView imageResult;
+    ImageView imageInput;
 
     String fileName = "";
     Module module;
@@ -43,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        imageInput = (ImageView)findViewById(R.id.imageInput);
         imageResult = (ImageView)findViewById(R.id.imageResult);
         textResult = (TextView)findViewById(R.id.textResult);
         textResult.setText("Result");
@@ -51,8 +54,19 @@ public class MainActivity extends AppCompatActivity {
         btnSetInput.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                fileName = "test"+String.valueOf(editTextNum.getText())+".jpg";
+                String num = String.valueOf(editTextNum.getText());
+                if(num.length() == 1){
+                    num = "0"+num;
+                }
+                fileName = "test"+num+".jpg";
                 editTextNum.setText("");
+                Bitmap tmpBitmap = null;
+                try {
+                    tmpBitmap = BitmapFactory.decodeStream(getAssets().open(fileName));
+                    imageInput.setImageBitmap(tmpBitmap);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
                 Toast.makeText(getApplicationContext(),"setting Done",Toast.LENGTH_SHORT).show();
                 //키보드 내리기에 사용됨
                 InputMethodManager inputMethodManager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);

@@ -8,20 +8,23 @@
 
     <TextView
         android:id="@+id/textResult"
-        android:layout_width="wrap_content"
-        android:layout_height="19dp"
+        android:layout_width="118dp"
+        android:layout_height="43dp"
         android:layout_marginTop="30dp"
-        android:text="Hello World!"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
+        android:text="Result Image"
+        android:textColor="#000000"
+        android:textSize="20sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@+id/imageInput"
         app:layout_constraintTop_toBottomOf="@+id/imageResult" />
 
     <ImageView
         android:id="@+id/imageResult"
         android:layout_width="match_parent"
         android:layout_height="300dp"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
+        app:srcCompat="@android:drawable/ic_popup_sync"
         tools:srcCompat="@tools:sample/avatars" />
 
     <Button
@@ -41,7 +44,7 @@
         android:layout_marginStart="32dp"
         android:layout_marginBottom="20dp"
         android:ems="10"
-        android:hint="input num (01~15)"
+        android:hint="input num (1~15)"
         android:inputType="textPersonName"
         app:layout_constraintBottom_toTopOf="@+id/btnPredict"
         app:layout_constraintStart_toStartOf="parent" />
@@ -55,5 +58,26 @@
         android:text="setInput"
         app:layout_constraintBottom_toTopOf="@+id/btnPredict"
         app:layout_constraintStart_toEndOf="@+id/editTextNum" />
+
+    <ImageView
+        android:id="@+id/imageInput"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/imageResult"
+        app:srcCompat="@android:drawable/ic_popup_sync"
+        tools:srcCompat="@tools:sample/avatars" />
+
+    <TextView
+        android:id="@+id/textView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="35dp"
+        android:layout_marginTop="20dp"
+        android:text="Input Image"
+        android:textSize="15sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/imageInput" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
