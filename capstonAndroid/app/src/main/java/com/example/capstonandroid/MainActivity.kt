@@ -3,30 +3,38 @@ package com.example.capstonandroid
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.ImageFormat
+import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
-import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.*
-import android.hardware.camera2.params.StreamConfigurationMap
-import android.media.Image
-import android.media.ImageReader
 import android.os.Bundle
-import android.os.Handler
-import android.os.HandlerThread
+import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.TextureView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
+import io.reactivex.rxjava3.core.Observable
+import io.reactivex.rxjava3.kotlin.subscribeBy
+import io.reactivex.rxjava3.schedulers.Schedulers
+import io.reactivex.rxjava3.subjects.PublishSubject
 import kotlinx.android.synthetic.main.activity_main.*
+import org.pytorch.LiteModuleLoader
+import org.pytorch.Module
+import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
-import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
+
+/*
+로딩 화면에서 권한 확인하도록 변경해야함
+* */
 
 /**
- * TextureView는 SurfaceTexture에 그려진 그림을 나타냄
- * SurfaceTextureListener로 나타내는 부분 구현
+ * TextureView는 SurfaceTexture에 그려진 그림을 나타냄리
+ * SurfaceTexture의 surface는 session의 data를 반영함
+ * SurfaceTextureListener로 후처
  *
  * 동작 순서 정리
  * textureSurfaceView 준비됨
@@ -42,6 +50,12 @@ import java.nio.ByteBuffer
 
 class MainActivity : AppCompatActivity() {
 
+    var subject : PublishSubject<Int> = PublishSubject.create()
+    var check : Boolean = true
+    var changeText : PublishSubject<String> = PublishSubject.create()
+
+    lateinit var module : Module
+
     lateinit var imageDimension : Size
     lateinit var cameraDevice : CameraDevice
     lateinit var surfaceTexture : SurfaceTexture
@@ -54,6 +68,51 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        setMoudle()
+        bindRx()
+        setTextureView()
+    }
+    fun setMoudle(){
+        module = LiteModuleLoader.load(assetFilePath(this, "fcn_rlstm_android.ptl"));
+    }
+    fun bindRx(){
+        subject
+            .subscribeOn(Schedulers.computation())
+            .filter { check }
+            .delay(1000, TimeUnit.NANOSECONDS)
+            .subscribeBy(
+                onNext = {
+                    check = false
+                    var tensor : Array< Array<Int> > = bitmapToRGBTensor(textureView.bitmap!!)
+
+                    changeText.onNext("0,0에서의 R: ${tensor[0][0]},G: ${tensor[1][0]}, B: ${tensor[2][0]}")
+                },
+                onComplete = {},
+                onError = {Log.e("에러","subject에서 에러 발생")}
+            )
+
+        changeText
+            .subscribeOn(Schedulers.io()) // 데이터 흐름을 발생시키는데 (내려가며 읽는 동작) 영향
+            .observeOn(AndroidSchedulers.mainThread()) // observer에게 데이터를 보낼 때 영향
+            .subscribeBy (
+                onNext = {
+                    resultTextView.text = it
+                    Log.e("test",it)
+                    check = true
+                         },
+                onComplete = {
+                    Log.e("텍스트 변환 완료","")
+                             },
+                onError = {
+                    Log.e("changeText 에러", it.message.toString())
+                }
+            )
+
+    }
+
+    fun setTextureView(){
+        linearForTextureView.layoutParams.height = resources.displayMetrics.heightPixels/2
+
         textureView.surfaceTextureListener = textureListener
     }
 
@@ -62,7 +121,9 @@ class MainActivity : AppCompatActivity() {
             // 사이즈가 바뀔 때
         }
         override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
-
+            // 이미지가 바뀔때마다 bitmap으로 따옴
+//            Log.e("화면 Tensor", bitmapToRGBTensor(textureView.bitmap!!)[0].size.toString())
+            subject.onNext(1)
         }
         override fun onSurfaceTextureDestroyed(p0: SurfaceTexture): Boolean {
             // 지정된 SurfaceTexture 를 파괴하고자 할 때 호출된다
@@ -141,13 +202,15 @@ class MainActivity : AppCompatActivity() {
 
             // 미리보기를 위한 Surface 기본 버퍼의 크기는 카메라 미리보기크기로 구성
             surfaceTexture.setDefaultBufferSize(imageDimension!!.width, imageDimension!!.height)
+//            surfaceTexture.setDefaultBufferSize(200, 200)
+
 
             // 미리보기를 시작하기 위해 필요한 출력표면인 surface
             surface = Surface(surfaceTexture)
 
             // 미리보기 화면을 요청하는 RequestBuilder 를 만들어준다.
             // 이 요청은 위에서 만든 surface 를 타겟으로 한다
-            captureRequestBuilder = cameraDevice!!.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+            captureRequestBuilder = cameraDevice!!.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
             captureRequestBuilder.addTarget(surface)
 
 //            // 이미지 캡쳐를 위한 ImageReader생성 및 타겟 추가
@@ -185,40 +248,44 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-//    private fun takePicture() : Unit {
-//        if(cameraDevice == null) return
-//
-//        // 이미지 Reader 생성
-//        var manager : CameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
-//        var characteristics : CameraCharacteristics = manager.getCameraCharacteristics(cameraDevice.id)
-//        var jpegSizes : Array<Size> = emptyArray()
-//        jpegSizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.JPEG)
-//        var width = 640
-//        var height = 480
-//        if(jpegSizes.isNotEmpty()){
-//            width = jpegSizes[0].getWidth();
-//            height = jpegSizes[0].getHeight();
-//        }
-//        var reader : ImageReader = ImageReader.newInstance(width,height, ImageFormat.JPEG, 1)
-//
-//        // 미리보기를 위한 textureSurface와 이미지를 읽기 위한 Reader의 Surface들 선언
-//        var outputSurfaces : MutableList<Surface> = mutableListOf()
-//        outputSurfaces.add(reader.surface)
-//        outputSurfaces.add(Surface(texture))
-//
-//
-//        var captureBuilder : CaptureRequest.Builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_VIDEO_SNAPSHOT)
-//        captureBuilder.addTarget(reader.surface)
-//        captureBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_MODE_AUTO)
-//        captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, windowManager.defaultDisplay.rotation)
-//        var readerListener : ImageReader.OnImageAvailableListener = object : ImageReader.OnImageAvailableListener{
-//            override fun onImageAvailable(p0: ImageReader?) {
-//                var image : Image
-//                image = reader.acquireLatestImage()
-//            }
-//        }
-//        reader.setOnImageAvailableListener(readerListener, )
-//    }
+    fun bitmapToRGBTensor(bitmap : Bitmap) : Array< Array<Int> >{
+        var tensor = Array(3) {Array(bitmap.height * bitmap.width) {0} }
+        // 열(가로)을 하나씩 본다
+        for( j in 0 until bitmap.height){
+            for (i in 0 until bitmap.width){
+                var p = bitmap.getPixel(i,j)
 
+                var R = (p and 0xff0000) shr 16
+                var G = (p and 0x00ff00) shr 8
+                var B = (p and 0x0000ff) shr 0
 
+                var index = j*bitmap.width + i
+                tensor[0][index] = R
+                tensor[1][index] = G
+                tensor[2][index] = B
+            }
+        }
+
+        return tensor
+    }
+
+    fun assetFilePath(context : Context, assetName : String) : String {
+        var file: File = File(context.filesDir, assetName)
+        if (file.exists() && file.length() > 0) {
+            return file.absolutePath
+        }
+        var iStream: InputStream = context.assets.open(assetName)
+        var oStream: OutputStream = FileOutputStream(file)
+
+        var buffer: ByteArray = ByteArray(4 * 1024)
+        var read: Int
+        while (true) {
+            read = iStream.read(buffer)
+            if (read == -1) break
+            oStream.write(buffer, 0, read)
+        }
+        oStream.flush()
+
+        return file.absolutePath
+    }
 }
