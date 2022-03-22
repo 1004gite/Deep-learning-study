@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.*
 import android.os.Bundle
@@ -14,13 +15,11 @@ import android.view.TextureView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
-import io.reactivex.rxjava3.core.Observable
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.schedulers.Schedulers
 import io.reactivex.rxjava3.subjects.PublishSubject
 import kotlinx.android.synthetic.main.activity_main.*
-import org.pytorch.LiteModuleLoader
-import org.pytorch.Module
+import org.pytorch.*
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -55,6 +54,9 @@ class MainActivity : AppCompatActivity() {
     var changeText : PublishSubject<String> = PublishSubject.create()
 
     lateinit var module : Module
+    var bitmapArr : ArrayList<Bitmap> = ArrayList()
+    var tmpBitmap : Bitmap = Bitmap.createBitmap(10,10,Bitmap.Config.ALPHA_8)
+    var densityBitmaps : ArrayList<Bitmap> = ArrayList()
 
     lateinit var imageDimension : Size
     lateinit var cameraDevice : CameraDevice
@@ -73,22 +75,34 @@ class MainActivity : AppCompatActivity() {
         setTextureView()
     }
     fun setMoudle(){
-        module = LiteModuleLoader.load(assetFilePath(this, "fcn_rlstm_android.ptl"));
+        module = LiteModuleLoader.load(assetFilePath(this, "fcn_rlstm2_android.ptl"))
+        Log.e("모델","모델 로딩")
     }
     fun bindRx(){
         subject
-            .subscribeOn(Schedulers.computation())
+            .subscribeOn(Schedulers.io())
+            .observeOn(Schedulers.computation())
             .filter { check }
             .delay(1000, TimeUnit.NANOSECONDS)
             .subscribeBy(
                 onNext = {
-                    check = false
-                    var tensor : Array< Array<Int> > = bitmapToRGBTensor(textureView.bitmap!!)
-
-                    changeText.onNext("0,0에서의 R: ${tensor[0][0]},G: ${tensor[1][0]}, B: ${tensor[2][0]}")
+                    if(bitmapArr.size < 5) {
+                        var bitmap: Bitmap = textureView.bitmap!!
+                        bitmap = Bitmap.createScaledBitmap(bitmap, 120, 160, true)
+//                        bitmap = Bitmap.createScaledBitmap(bitmap, 640, 480, true)
+                        bitmapArr.add(bitmap)
+                        Log.e("subject","비트맵 추가")
+                    }
+                    if(bitmapArr.size >= 5) {
+                        check = false
+                        var Farr =  bitmapToRGBArr(bitmapArr)
+                        var result = getModelResult(Farr)
+                        changeText.onNext(result)
+                        Log.e("subject","계산 완료")
+                    }
                 },
                 onComplete = {},
-                onError = {Log.e("에러","subject에서 에러 발생")}
+                onError = {Log.e("에러_subject",it.message.toString())}
             )
 
         changeText
@@ -97,17 +111,62 @@ class MainActivity : AppCompatActivity() {
             .subscribeBy (
                 onNext = {
                     resultTextView.text = it
-                    Log.e("test",it)
+
+                    image_density1.setImageBitmap(densityBitmaps[0])
+                    image_density2.setImageBitmap(densityBitmaps[1])
+                    image_density3.setImageBitmap(densityBitmaps[2])
+                    image_density4.setImageBitmap(densityBitmaps[3])
+                    image_density5.setImageBitmap(densityBitmaps[4])
+
+                    testImage.setImageBitmap(tmpBitmap)
                     check = true
+                    Log.e("UI","UI 적용")
                          },
-                onComplete = {
-                    Log.e("텍스트 변환 완료","")
-                             },
+                onComplete = {},
                 onError = {
                     Log.e("changeText 에러", it.message.toString())
                 }
             )
+    }
+    fun getModelResult(floatArr : FloatArray) : String{
+        // preparing input tensor
+//        var inputTensor : Tensor = TensorImageUtils.bitmapToFloat32Tensor(
+//            bitmap,
+//            TensorImageUtils.TORCHVISION_NORM_MEAN_RGB,
+//            TensorImageUtils.TORCHVISION_NORM_STD_RGB,
+//            MemoryFormat.CHANNELS_LAST)
+        var shape : LongArray = LongArray(5).also {
+            it[0] = 5L
+            it[1] = 1L
+            it[2] = 3L
+            it[3] = 120L
+            it[4] = 160L
+        }
+//        var shape : LongArray = LongArray(4).also {
+//            it[0] = 1L
+//            it[1] = 3L
+//            it[2] = 640L
+//            it[3] = 480L
+//        }
+        var inputTensor : Tensor = Tensor.fromBlob(floatArr, shape)
+//        Log.e("shape", inputTensor.shape().contentToString())
 
+        // running the model
+        var output = module.forward(IValue.from(inputTensor)).toTuple()
+//         output[0].toTensor().dataAsFloatArray -> densitymap
+//        output[1].toTensor().dataAsFloatArray -> result
+//        Log.e("output[0]","size: "+output[0].toTensor().dataAsFloatArray.size.toString())
+//        Log.e("output[1]",output[1].toTensor().dtype().toString())
+
+        // 어떤 이미지가 input으로 들어갔는지
+        tmpBitmap =  Bitmap.createScaledBitmap(bitmapArr[0],450,600,true)
+
+        // densitymap 5개 세팅
+        setDensityBitmap(output[0].toTensor().dataAsFloatArray)
+
+        bitmapArr.clear()
+
+        return output[1].toTensor().dataAsFloatArray[4].toString()
     }
 
     fun setTextureView(){
@@ -248,25 +307,46 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun bitmapToRGBTensor(bitmap : Bitmap) : Array< Array<Int> >{
-        var tensor = Array(3) {Array(bitmap.height * bitmap.width) {0} }
+    fun bitmapToRGBArr(bitmapArray : ArrayList<Bitmap>) : FloatArray{
+        var batchsize = bitmapArray.size
+        var width = bitmapArray[0].width
+        var height = bitmapArray[0].height
+        var bitmapSize = height*width
+        var arr : FloatArray = FloatArray(height * width * 3 * batchsize) {0f}
         // 열(가로)을 하나씩 본다
-        for( j in 0 until bitmap.height){
-            for (i in 0 until bitmap.width){
-                var p = bitmap.getPixel(i,j)
+        for( batch in 0 until batchsize) {
+            for (j in 0 until height) {
+                for (i in 0 until width) {
+                    var p = bitmapArray[batch].getPixel(i, j)
 
-                var R = (p and 0xff0000) shr 16
-                var G = (p and 0x00ff00) shr 8
-                var B = (p and 0x0000ff) shr 0
+                    var R = (p and 0xff0000) shr 16
+                    var G = (p and 0x00ff00) shr 8
+                    var B = (p and 0x0000ff) shr 0
 
-                var index = j*bitmap.width + i
-                tensor[0][index] = R
-                tensor[1][index] = G
-                tensor[2][index] = B
+                    var index = j * width + i
+                    arr[index] = R.toFloat()
+                    arr[bitmapSize+index] = G.toFloat()
+                    arr[(bitmapSize*2)+index] = B.toFloat()
+                }
             }
         }
 
-        return tensor
+        return arr
+    }
+
+    fun setDensityBitmap(floatArr : FloatArray){
+        densityBitmaps.clear()
+        var intArray : IntArray = IntArray(floatArr.size/5)
+        var size = floatArr.size/5
+        for(count in 0 until 5) {
+            for (i in 0 until size) {
+                intArray[i] = floatArr[size*count + i].toInt()
+            }
+            var tmp = Bitmap.createBitmap(120,160,Bitmap.Config.ALPHA_8)
+            tmp.setPixels(intArray,0,120,0,0,120,160)
+            tmp = Bitmap.createScaledBitmap(tmp, 450, 600, true)
+            densityBitmaps.add(tmp)
+        }
     }
 
     fun assetFilePath(context : Context, assetName : String) : String {
