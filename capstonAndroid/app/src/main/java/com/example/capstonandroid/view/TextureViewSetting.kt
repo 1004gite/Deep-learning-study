@@ -1,31 +1,48 @@
 package com.example.capstonandroid.view
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.*
+import android.util.Size
 import android.view.Surface
 import android.view.TextureView
+import android.widget.LinearLayout
 import androidx.core.app.ActivityCompat
+import com.example.capstonandroid.model.Datas
 import kotlinx.android.synthetic.main.activity_main.*
 
 /**
  * textureView의 변화를 model에 전달
  * */
-class TextureViewSetting(
-    var linearForTextureView: TextureView,
-    var textureView: TextureView,
-    var preViewHeight: Int) {
 
-    init {
-        setTextureView()
-    }
+/**
+ * TextureView는 SurfaceTexture에 그려진 그림을 나타냄리
+ * SurfaceTexture의 surface는 session의 data를 반영함
+ * SurfaceTextureListener로 후처
+ *
+ * 동작 순서 정리
+ * textureSurfaceView 준비됨
+ * 카메라 manager를 이용하여 surface정보에 맞게 카메라를 연다.
+ * 이떄 createCameraPreviewSession 함수에서 session을 만들고 원하는 surfaceTextuer의 surface를 target으로 추가
+ *
+ * builder가 session에 data를 뿌려줌 -> surface가 session에서 오는 데이터를 적용
+ * **/
+class TextureViewSetting(var context: Context) {
 
-    private fun setTextureView(){
-//        linearForTextureView.layoutParams.height = resources.displayMetrics.heightPixels/2
-        linearForTextureView.layoutParams.height = preViewHeight
-        textureView.surfaceTextureListener = textureListener
+    var activity_main : Activity = context as Activity
+    lateinit var imageDimension : Size
+    lateinit var cameraDevice : CameraDevice
+    lateinit var surface : Surface
+    lateinit var captureRequestBuilder : CaptureRequest.Builder
+    lateinit var cameraCaptureSessions : CameraCaptureSession
+    var cameraId = "0"
+
+    fun setTextureView(){
+        activity_main.linearForTextureView.layoutParams.height = activity_main.resources.displayMetrics.heightPixels/2
+        activity_main.textureView.surfaceTextureListener = textureListener
     }
 
     private var textureListener: TextureView.SurfaceTextureListener = object : TextureView.SurfaceTextureListener {
@@ -33,9 +50,8 @@ class TextureViewSetting(
             // 사이즈가 바뀔 때
         }
         override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
-            // 이미지가 바뀔때마다 model에 bitmap을 넘겨준다
-            /** bitmap을 넘겨주는 과정에 렉이 발생하면 신호만 주고 받는쪽에서 다른 쓰레드로 textureview에서 bitmap을 따는 것을 고려하자 */
-            subject.onNext(1)
+            // 이미지가 바뀔때마다 model에 이미지가 바뀌었다는 이벤트를 발생시킨다
+            Datas.instance.bitmapSubject.onNext(activity_main.textureView.bitmap)
         }
         override fun onSurfaceTextureDestroyed(p0: SurfaceTexture): Boolean {
             // 지정된 SurfaceTexture 를 파괴하고자 할 때 호출된다
@@ -54,7 +70,7 @@ class TextureViewSetting(
     private fun openCamera() {
         // 카메라의 정보를 가져와서 cameraId 와 imageDimension 에 값을 할당하고, 카메라를 열어야 하기 때문에
         // CameraManager 객체를 가져온다
-        val manager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        val manager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
         try {
             // CameraManager 에서 cameraIdList 의 값을 가져온다
@@ -67,10 +83,10 @@ class TextureViewSetting(
             // SurfaceTexture 에 사용할 Size 값을 map 에서 가져와 imageDimension 에 할당해준다
             imageDimension = map!!.getOutputSizes<SurfaceTexture>(SurfaceTexture::class.java)[0]
 
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
             {
                 // 카메라 권한이 없는 경우 권한을 요청한다
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE), 100)
+                ActivityCompat.requestPermissions(context as Activity, arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE), 100)
                 return
             }
 
@@ -110,12 +126,11 @@ class TextureViewSetting(
 
             // 캡쳐세션을 만들기 전에 프리뷰를 위한 Surface 를 준비한다
             // 레이아웃에 선언된 textureView 로부터 surfaceTexture 를 얻을 수 있다
-            surfaceTexture = textureView.surfaceTexture!!
+            var surfaceTexture : SurfaceTexture = activity_main.textureView.surfaceTexture!!
 
             // 미리보기를 위한 Surface 기본 버퍼의 크기는 카메라 미리보기크기로 구성
             surfaceTexture.setDefaultBufferSize(imageDimension!!.width, imageDimension!!.height)
 //            surfaceTexture.setDefaultBufferSize(200, 200)
-
 
             // 미리보기를 시작하기 위해 필요한 출력표면인 surface
             surface = Surface(surfaceTexture)
