@@ -41,7 +41,8 @@ class TextureViewSetting(var context: Context) {
     var cameraId = "0"
 
     fun setTextureView(){
-        activity_main.linearForTextureView.layoutParams.height = activity_main.resources.displayMetrics.heightPixels/2
+//        activity_main.linearForTextureView.layoutParams.height = activity_main.resources.displayMetrics.heightPixels/2
+        activity_main.linearForTextureView.layoutParams.height = activity_main.resources.displayMetrics.widthPixels/4*3
         activity_main.textureView.surfaceTextureListener = textureListener
     }
 

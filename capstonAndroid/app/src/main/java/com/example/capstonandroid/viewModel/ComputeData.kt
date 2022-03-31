@@ -4,7 +4,11 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
+import android.widget.TextView
 import com.example.capstonandroid.model.Datas.Companion.instance
+import com.example.capstonandroid.model.DebugEvent
+import com.example.capstonandroid.model.DesignEvent
+import com.jakewharton.rxbinding4.widget.textChangeEvents
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.schedulers.Schedulers
@@ -14,64 +18,58 @@ import org.pytorch.IValue
 import org.pytorch.LiteModuleLoader
 import org.pytorch.Module
 import org.pytorch.Tensor
+import org.pytorch.torchvision.TensorImageUtils
+import java.nio.ByteBuffer
+import java.nio.FloatBuffer
 import java.util.concurrent.TimeUnit
 
-class ComputeData(context : Context) {
+class ComputeData(context: Context) {
 
-    var batch : Int = 5
-    var activity_main : Activity = context as Activity
-    var Utils : UtilsForPytorch = UtilsForPytorch()
-    var module : Module = LiteModuleLoader.load( Utils.assetFilePath(context, "fcn_rlstm2_android.ptl"))
-    var changeText : PublishSubject<Boolean> = PublishSubject.create()
+    var batch: Int = 5
+    var activity_main: Activity = context as Activity
+    var Utils: UtilsForPytorch = UtilsForPytorch()
+    var module: Module =
+        LiteModuleLoader.load(Utils.assetFilePath(context, "fcn_rlstm2_android.ptl"))
+    var changeUI: PublishSubject<Boolean> = PublishSubject.create()
 
-    /** for inputTensor Test*/
-    lateinit var bitmapR : Bitmap
-    lateinit var bitmapG : Bitmap
-    lateinit var bitmapB : Bitmap
 
-    fun bindRx(){
+    fun bindRx() {
         instance.bitmapSubject
             .map { it!! }
             .subscribeOn(Schedulers.io())
             .observeOn(Schedulers.computation())
             .filter { !instance.isComputing }
+            .delay(1000L, TimeUnit.NANOSECONDS)
+            .filter { !instance.isComputing }
             .subscribeBy(
                 onNext = {
-                    if( instance.bitmapArr.size < batch) {
-                        var bitmap: Bitmap = it
-                        bitmap = Bitmap.createScaledBitmap(bitmap, 120, 160, true)
+                    if (instance.bitmapArr.size < batch) {
+                        var bitmap: Bitmap = Bitmap.createScaledBitmap(it, 160, 120, true)
 //                        bitmap = Bitmap.createScaledBitmap(bitmap, 640, 480, true)
                         instance.bitmapArr.add(bitmap)
-                        Log.e("subject","비트맵 추가 ${instance.bitmapArr.size}개째")
+                        Log.e("subject", "비트맵 추가 ${instance.bitmapArr.size}개째")
                     }
-                    if(instance.bitmapArr.size >= batch) {
-//                        var Farr =  Utils.bitmapToRGBArr(instance.bitmapArr)
-                        instance.resultText = getModelResult()
-                        changeText.onNext(true)
-                        Log.e("subject","계산 완료")
+                    if (instance.bitmapArr.size >= batch) {
+                        instance.isComputing = true
+                        runModel()
+                        instance.designEventSubject.onNext(DesignEvent.DebugLoadEnd)
+                        changeUI.onNext(true)
+                        Log.e("subject", "계산 완료")
                     }
                 },
                 onComplete = {},
-                onError = { Log.e("에러_subject",it.message.toString())}
+                onError = { Log.e("에러_subject", it.message.toString()) }
             )
 
-        changeText
-            .delay(5000L, TimeUnit.NANOSECONDS)
+        changeUI
             .subscribeOn(Schedulers.io()) // 데이터 흐름을 발생시키는데 (내려가며 읽는 동작) 영향
             .observeOn(AndroidSchedulers.mainThread()) // observer에게 데이터를 보낼 때 영향
-            .subscribeBy (
+            .subscribeBy(
                 onNext = {
-                    instance.isComputing = false
-//                    activity_main.testR.setImageBitmap(bitmapR)
-//                    activity_main.testG.setImageBitmap(bitmapG)
-//                    activity_main.testB.setImageBitmap(bitmapB)
-                    activity_main.image_density1.setImageBitmap(instance.densityBitmaps[0])
-                    activity_main.image_density2.setImageBitmap(instance.densityBitmaps[1])
-                    activity_main.image_density3.setImageBitmap(instance.densityBitmaps[2])
-                    activity_main.image_density4.setImageBitmap(instance.densityBitmaps[3])
-                    activity_main.image_density5.setImageBitmap(instance.densityBitmaps[4])
                     activity_main.resultTextView.text = instance.resultText
-                    Log.e("UI","UI 적용")
+                    activity_main.imageDebug.setImageBitmap(instance.debugBitmap)
+                    instance.isComputing = false
+                    Log.e("UI", "UI 적용")
                 },
                 onComplete = {},
                 onError = {
@@ -80,9 +78,9 @@ class ComputeData(context : Context) {
             )
     }
 
-    fun getModelResult() : String{
+    fun runModel() {
 
-        var shape : LongArray = LongArray(5).also {
+        var shape: LongArray = LongArray(5).also {
             it[0] = batch.toLong()
             it[1] = 1L
             it[2] = 3L
@@ -90,51 +88,86 @@ class ComputeData(context : Context) {
             it[4] = 160L
         }
         var floatArr = Utils.bitmapToRGBArr(instance.bitmapArr)
-        var inputTensor : Tensor = Tensor.fromBlob(floatArr, shape)
+        var inputTensor: Tensor = Tensor.fromBlob(floatArr, shape)
 //        Log.e("shape", inputTensor.shape().contentToString())
+//        inputTensor = outputTest()
 
         // running the model
         var output = module.forward(IValue.from(inputTensor)).toTuple()
 //         output[0].toTensor().dataAsFloatArray -> densitymap
 //        output[1].toTensor().dataAsFloatArray -> result
 
+        //결과 적용
+        instance.resultText = output[1].toTensor().dataAsFloatArray[batch - 1].toString()
         instance.bitmapArr.clear()
 
-        /** For densitymap test*/
-        var tmpsize = 120*160
-        instance.densityBitmaps.clear()
-        var densityArr = output[0].toTensor().dataAsFloatArray
-        for(i in 0 until batch){
-            var tmparr : FloatArray = FloatArray(tmpsize)
-            for(x in 0 until tmpsize){
-                tmparr[x] = densityArr[tmpsize*i + x]
+        //디버그 적용
+        var tmpsize = 120 * 160
+        var indexStartLastbatch = (tmpsize * 3) * (batch - 1)
+        var bitmap: Bitmap = instance.inputBitmap
+        when (instance.debugEvent) {
+            DebugEvent.InputR -> {
+                bitmap = Utils.floatArrayToBitmap(
+                    inputTensor.dataAsFloatArray.sliceArray(0 until tmpsize),
+                    160,
+                    120
+                )
             }
-            var bmp = Utils.floatArrayToBitmap(tmparr,120,160)
-            instance.densityBitmaps.add( Bitmap.createScaledBitmap(bmp,450,600,true) )
+            DebugEvent.InputG -> {
+                bitmap = Utils.floatArrayToBitmap(
+                    inputTensor.dataAsFloatArray.sliceArray(tmpsize until tmpsize * 2),
+                    160,
+                    120
+                )
+            }
+            DebugEvent.InputB -> {
+                bitmap = Utils.floatArrayToBitmap(
+                    inputTensor.dataAsFloatArray.sliceArray(tmpsize * 2 until tmpsize * 3),
+                    160,
+                    120
+                )
+            }
+            DebugEvent.outputDensitymap -> {
+                var tmparr =
+                    output[0].toTensor().dataAsFloatArray.sliceArray(tmpsize * (batch - 1) until tmpsize * (batch))
+//                    for(i in 0 until tmparr.size){
+//                        tmparr[i] = (tmparr[i].toBits() shl 8).toFloat()
+//                    }
+                bitmap = Utils.floatArrayToBitmap(
+                    tmparr,
+                    160,
+                    120
+                )
+            }
+            else -> {}
         }
-        /** For inputTensor test*/
-//        var inputarr = inputTensor.dataAsFloatArray
-//        var tmpR : FloatArray = FloatArray(tmpsize)
-//        var tmpG : FloatArray = FloatArray(tmpsize)
-//        var tmpB : FloatArray = FloatArray(tmpsize)
-//        for(x in 0 until tmpsize){
-//            tmpR[x] = inputarr[x]
-//        }
-//        bitmapR = Utils.floatArrayToBitmap(tmpR,120,160)
-//        bitmapR = Bitmap.createScaledBitmap(bitmapR,450,600,true)
-//        for(x in 0 until tmpsize){
-//            tmpG[x] = inputarr[tmpsize+x]
-//        }
-//        bitmapG = Utils.floatArrayToBitmap(tmpG,120,160)
-//        bitmapG = Bitmap.createScaledBitmap(bitmapG,450,600,true)
-//        for(x in 0 until tmpsize){
-//            tmpB[x] = inputarr[tmpsize*2+x]
-//        }
-//        bitmapB = Utils.floatArrayToBitmap(tmpB,120,160)
-//        bitmapB = Bitmap.createScaledBitmap(bitmapB,450,600,true)
-
-        /** Test End*/
-
-        return output[1].toTensor().dataAsFloatArray[batch-1].toString()
+        Log.e("debugSelect", instance.debugEvent.toString())
+        instance.debugBitmap = Bitmap.createScaledBitmap(bitmap, 600, 450, true)
     }
+
+//    fun inputTest() : Tensor{
+//        var arr : FloatArray = FloatArray(120*160*3*batch)
+//        var list = ArrayList<FloatArray>()
+//        for( bitmap in instance.bitmapArr){
+//            var bmp = Bitmap.createScaledBitmap(bitmap,160,120,true)
+//            list.add(TensorImageUtils.bitmapToFloat32Tensor(bmp,0,0,160,120,
+//                TensorImageUtils.TORCHVISION_NORM_MEAN_RGB, TensorImageUtils.TORCHVISION_NORM_STD_RGB)
+//                .dataAsFloatArray)
+//        }
+//        for(x in 0 until batch) {
+//            var offset = 120 * 160 * 3 * x
+//            for (i in 0 until 120 * 160 * 3) {
+//                arr[offset+i] = list[x][i]
+//            }
+//        }
+//
+//        var shape : LongArray = LongArray(5).also {
+//            it[0] = batch.toLong()
+//            it[1] = 1L
+//            it[2] = 3L
+//            it[3] = 120L
+//            it[4] = 160L
+//        }
+//        return Tensor.fromBlob(arr,shape)
+//    }
 }

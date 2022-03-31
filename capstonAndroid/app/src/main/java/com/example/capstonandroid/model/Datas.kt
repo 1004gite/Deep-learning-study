@@ -21,8 +21,15 @@ class Datas {
     var resultText : String = ""
     var densityBitmaps : ArrayList<Bitmap> = ArrayList()
 
+    //debug 관련
+    var debugEvent : DebugEvent = DebugEvent.outputDensitymap
+    lateinit var debugBitmap : Bitmap
+    var listFordbug = listOf<DebugEvent>(DebugEvent.InputR,DebugEvent.InputG,DebugEvent.InputB,DebugEvent.outputDensitymap)
+
     // subjects
     var bitmapSubject : PublishSubject<Bitmap?> = PublishSubject.create()
+    var debugEventSubject : PublishSubject<DebugEvent> = PublishSubject.create()
+    var designEventSubject : PublishSubject<DesignEvent> = PublishSubject.create()
 
     fun bindSubjects(){
         bitmapSubject
@@ -35,5 +42,18 @@ class Datas {
                 },
                 { Log.e("bitmapSubjectErr",it.message.toString()) }
             )
+
+        debugEventSubject
+            .subscribeBy(
+                onNext = { debugEvent = it },
+                onError = {Log.e("deBugEventSubjectErr",it.message.toString())}
+            )
     }
+}
+
+enum class DebugEvent{
+    InputR, InputG, InputB, outputDensitymap
+}
+enum class DesignEvent{
+    DebugLoadStart, DebugLoadEnd
 }

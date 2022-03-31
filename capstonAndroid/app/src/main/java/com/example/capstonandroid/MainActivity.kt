@@ -3,8 +3,10 @@ package com.example.capstonandroid
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import com.example.capstonandroid.model.Datas
+import com.example.capstonandroid.view.BindViews
 import com.example.capstonandroid.view.TextureViewSetting
 import com.example.capstonandroid.viewModel.ComputeData
+import com.example.capstonandroid.viewModel.Designs
 import org.pytorch.Module
 
 /*
@@ -14,7 +16,8 @@ import org.pytorch.Module
 class MainActivity : AppCompatActivity() {
 
     lateinit var computeData: ComputeData
-    lateinit var textureViewSetting: TextureViewSetting
+    lateinit var bindViews: BindViews
+    lateinit var designs: Designs
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,8 +30,11 @@ class MainActivity : AppCompatActivity() {
         computeData = ComputeData(this)
         computeData.bindRx()
 
-        textureViewSetting = TextureViewSetting(this)
-        textureViewSetting.setTextureView()
+        designs = Designs(this)
+        designs.setDesigns()
+
+        bindViews = BindViews(this)
+        bindViews.bindViews()
     }
 
 }
