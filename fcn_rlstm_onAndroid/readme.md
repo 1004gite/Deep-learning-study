@@ -1,7 +1,5 @@
 ## 차량 개수 인식 모델 fcn_rlstm을 android에서 구동하기 위함  
-> input으로 들어오는 사진에 맞는 mask를 같이 넣어줘야 하는 부분에서 2가지 문제가 발생해 프로젝트 방향 변경  
-> > 문제 1  
-> > input을 2개 넣어줘야 하는데 pytorch_mobile의 module 클래스에서는 이가 불가능하다.  
->   
-> > 문제 2  
-> 사진의 영역 중 도로가 아닌 곳을 mask로 처리해줘야 하는데 이는 고정된 위치에서 같은 화면만을 찍어야 하므로 모바일에서 돌리기 부적합하다.
+>> 모델의 미완성으로 인해 추후 업데이트 예정  
+>>   
+>> pytorch mpbile 라이브러리를 이용하여 모델을 구동  
+>> camera2 api와 textureView를 이용해 bitmap 추출 및 inputTensor로 변환  
