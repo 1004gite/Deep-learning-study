@@ -1,4 +1,4 @@
-package com.example.capstonandroid.view
+package com.example.capstonandroid.settingViews
 
 import android.Manifest
 import android.app.Activity
@@ -9,9 +9,8 @@ import android.hardware.camera2.*
 import android.util.Size
 import android.view.Surface
 import android.view.TextureView
-import android.widget.LinearLayout
 import androidx.core.app.ActivityCompat
-import com.example.capstonandroid.model.Datas
+import com.example.capstonandroid.Data.Datas
 import kotlinx.android.synthetic.main.activity_main.*
 
 /**

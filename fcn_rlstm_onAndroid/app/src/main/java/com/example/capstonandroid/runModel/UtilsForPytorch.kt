@@ -1,10 +1,7 @@
-package com.example.capstonandroid.viewModel
+package com.example.capstonandroid.runModel
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Color
-import android.util.Log
-import org.pytorch.Tensor
 import java.io.*
 import java.nio.ByteBuffer
 

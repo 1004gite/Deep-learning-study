@@ -1,4 +1,4 @@
-package com.example.capstonandroid.model
+package com.example.capstonandroid.Data
 
 import android.graphics.Bitmap
 import android.util.Log

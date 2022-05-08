@@ -1,11 +1,10 @@
-package com.example.capstonandroid.viewModel
+package com.example.capstonandroid.runModel
 
 import android.app.Activity
 import android.content.Context
 import android.util.Log
-import android.view.View
-import com.example.capstonandroid.model.Datas
-import com.example.capstonandroid.model.DesignEvent
+import com.example.capstonandroid.Data.Datas
+import com.example.capstonandroid.Data.DesignEvent
 import com.github.florent37.fiftyshadesof.FiftyShadesOf
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.kotlin.subscribeBy

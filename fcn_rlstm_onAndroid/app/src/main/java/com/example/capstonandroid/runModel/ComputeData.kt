@@ -1,14 +1,12 @@
-package com.example.capstonandroid.viewModel
+package com.example.capstonandroid.runModel
 
 import android.app.Activity
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
-import android.widget.TextView
-import com.example.capstonandroid.model.Datas.Companion.instance
-import com.example.capstonandroid.model.DebugEvent
-import com.example.capstonandroid.model.DesignEvent
-import com.jakewharton.rxbinding4.widget.textChangeEvents
+import com.example.capstonandroid.Data.Datas.Companion.instance
+import com.example.capstonandroid.Data.DebugEvent
+import com.example.capstonandroid.Data.DesignEvent
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import io.reactivex.rxjava3.schedulers.Schedulers
@@ -18,9 +16,6 @@ import org.pytorch.IValue
 import org.pytorch.LiteModuleLoader
 import org.pytorch.Module
 import org.pytorch.Tensor
-import org.pytorch.torchvision.TensorImageUtils
-import java.nio.ByteBuffer
-import java.nio.FloatBuffer
 import java.util.concurrent.TimeUnit
 
 class ComputeData(context: Context) {

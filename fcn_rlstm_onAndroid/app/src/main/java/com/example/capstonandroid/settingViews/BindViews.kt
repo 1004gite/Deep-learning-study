@@ -1,16 +1,11 @@
-package com.example.capstonandroid.view
+package com.example.capstonandroid.settingViews
 
 import android.app.Activity
 import android.content.Context
 import android.util.Log
-import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.Toast
-import androidx.core.view.children
-import com.example.capstonandroid.model.Datas
-import com.example.capstonandroid.model.DebugEvent
-import com.example.capstonandroid.model.DesignEvent
-import com.jakewharton.rxbinding4.view.clicks
+import com.example.capstonandroid.Data.Datas
+import com.example.capstonandroid.Data.DesignEvent
 import com.jakewharton.rxbinding4.widget.itemClickEvents
 import io.reactivex.rxjava3.kotlin.subscribeBy
 import kotlinx.android.synthetic.main.activity_main.*
